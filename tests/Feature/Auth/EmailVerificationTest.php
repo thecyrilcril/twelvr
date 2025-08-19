@@ -46,3 +46,42 @@ test('email is not verified with invalid hash', function (): void {
 
     expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
 });
+
+test('email verification notification can be sent for unverified user', function (): void {
+    $user = User::factory()->unverified()->create();
+
+    $response = $this->actingAs($user)->post('/email/verification-notification');
+
+    $response->assertRedirect();
+    $response->assertSessionHas('status', 'verification-link-sent');
+});
+
+test('email verification notification redirects verified user to dashboard', function (): void {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post('/email/verification-notification');
+
+    $response->assertRedirect(route('dashboard', absolute: false));
+});
+
+test('email verification prompt redirects verified user to dashboard', function (): void {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->get('/verify-email');
+
+    $response->assertRedirect(route('dashboard', absolute: false));
+});
+
+test('email verification succeeds for already verified user', function (): void {
+    $user = User::factory()->create();
+
+    $verificationUrl = URL::temporarySignedRoute(
+        'verification.verify',
+        now()->addMinutes(60),
+        ['id' => $user->id, 'hash' => sha1((string) $user->email)]
+    );
+
+    $response = $this->actingAs($user)->get($verificationUrl);
+
+    $response->assertRedirect(route('dashboard', absolute: false) . '?verified=1');
+});

@@ -41,3 +41,24 @@ test('users can logout', function (): void {
     $this->assertGuest();
     $response->assertRedirect('/');
 });
+
+test('login is rate limited after too many failed attempts', function (): void {
+    $user = User::factory()->create();
+
+    // Make 5 failed login attempts to trigger rate limiting
+    for ($i = 0; $i < 5; $i++) {
+        $this->post('/login', [
+            'email' => $user->email,
+            'password' => 'wrong-password',
+        ]);
+    }
+
+    // The 6th attempt should trigger rate limiting
+    $response = $this->post('/login', [
+        'email' => $user->email,
+        'password' => 'wrong-password',
+    ]);
+
+    $response->assertSessionHasErrors(['email']);
+    $this->assertGuest();
+});
